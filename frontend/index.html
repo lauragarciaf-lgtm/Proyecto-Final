@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<!--
+  index.html
+  ---------------------------------------------------------------------------
+  Pagina principal del cliente web (frontend).
+
+  - ng-app="rutasApp"          : enlaza la pagina con el modulo de AngularJS.
+  - ng-controller="MainController" : el controlador que maneja esta pantalla.
+
+  Directivas de AngularJS usadas:
+    ng-repeat  -> repite un elemento por cada item de una lista.
+    ng-click   -> ejecuta una funcion al hacer clic.
+    ng-model   -> enlaza un campo de formulario con una variable.
+    ng-show / ng-if -> muestran u ocultan segun una condicion.
+    ng-class   -> aplica una clase CSS condicionalmente.
+  ---------------------------------------------------------------------------
+-->
+<html lang="es" ng-app="rutasApp">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rutas Turisticas</title>
+
+    <!-- AngularJS 1.x (desde CDN) -->
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.2/angular.min.js"></script>
+
+    <!-- Leaflet (mapa) desde CDN: CSS y JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- Estilos propios -->
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+
+<body ng-controller="MainController">
+
+    <!-- Encabezado -->
+    <header class="encabezado">
+        <h1>Rutas Turisticas</h1>
+    </header>
+
+    <div class="contenedor">
+
+        <!-- ===================== PANEL IZQUIERDO: CIUDADES ===================== -->
+        <aside class="panel-ciudades">
+            <div class="panel-titulo oscuro">1. Seleccione Ciudad</div>
+            <ul class="lista-ciudades">
+                <!-- Por cada ciudad se crea un item; al hacer clic se selecciona. -->
+                <li ng-repeat="ciudad in ciudades"
+                    ng-click="seleccionarCiudad(ciudad)"
+                    ng-class="{ 'activa': ciudadSeleccionada.id === ciudad.id }">
+                    <span class="ciudad-nombre">{{ ciudad.nombre }}</span>
+                </li>
+            </ul>
+        </aside>
+
+        <!-- ===================== AREA PRINCIPAL ===================== -->
+        <main class="area-principal">
+
+            <!-- Mensaje cuando no hay ciudad seleccionada -->
+            <div class="aviso" ng-if="!ciudadSeleccionada">
+                Selecciona una ciudad en el panel izquierdo para ver sus rutas.
+            </div>
+
+            <!-- ----------------- PANEL DE RUTAS ----------------- -->
+            <section class="tarjeta" ng-if="ciudadSeleccionada">
+                <div class="tarjeta-cabecera azul">
+                    <span>Rutas en: {{ ciudadSeleccionada.nombre }}</span>
+                    <button class="btn btn-claro" ng-click="nuevaRuta()">+ Agregar Ruta</button>
+                </div>
+
+                <!-- Formulario para crear/editar ruta (se muestra solo si rutaForm existe) -->
+                <div class="formulario" ng-if="rutaForm">
+                    <input type="text" placeholder="Nombre de la ruta" ng-model="rutaForm.nombre">
+                    <select ng-model="rutaForm.idTipo"
+                            ng-options="t.id as t.nombre for t in tipos"></select>
+                    <input type="text" placeholder="Descripcion" ng-model="rutaForm.descripcion">
+                    <button class="btn btn-verde" ng-click="guardarRuta()">Guardar</button>
+                    <button class="btn btn-gris" ng-click="cancelarRuta()">X</button>
+                </div>
+
+                <!-- Tabla de rutas -->
+                <table class="tabla">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Nombre de la Ruta</th>
+                            <th>Tipo</th>
+                            <th class="col-acciones">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr ng-repeat="ruta in rutas"
+                            ng-click="seleccionarRuta(ruta)"
+                            ng-class="{ 'fila-activa': rutaSeleccionada.id === ruta.id }">
+                            <td>{{ ruta.id }}</td>
+                            <td><strong>{{ ruta.nombre }}</strong></td>
+                            <td><span class="etiqueta">{{ nombreTipo(ruta.idTipo) }}</span></td>
+                            <td class="col-acciones">
+                                <!-- $event.stopPropagation evita que el clic seleccione la fila -->
+                                <button class="btn btn-amarillo"
+                                        ng-click="editarRuta(ruta); $event.stopPropagation()">Editar</button>
+                                <button class="btn btn-rojo"
+                                        ng-click="eliminarRuta(ruta); $event.stopPropagation()">Eliminar</button>
+                            </td>
+                        </tr>
+                        <tr ng-if="rutas.length === 0">
+                            <td colspan="4" class="vacio">Esta ciudad aun no tiene rutas. Agrega una.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <!-- ----------------- PANEL DE PARADAS ----------------- -->
+            <section class="tarjeta" ng-if="rutaSeleccionada">
+                <div class="tarjeta-cabecera verde">
+                    <span>Paradas de la Ruta: {{ rutaSeleccionada.nombre }}</span>
+                    <button class="btn btn-claro" ng-click="nuevaParada()">+ Agregar Parada</button>
+                </div>
+
+                <!-- Formulario para crear/editar parada -->
+                <div class="formulario" ng-if="paradaForm">
+                    <input type="number" class="campo-corto" placeholder="Orden" ng-model="paradaForm.orden">
+                    <input type="text" placeholder="Nombre parada" ng-model="paradaForm.nombre">
+                    <input type="number" step="any" placeholder="Latitud" ng-model="paradaForm.latitud">
+                    <input type="number" step="any" placeholder="Longitud" ng-model="paradaForm.longitud">
+                    <input type="number" class="campo-corto" placeholder="Min." ng-model="paradaForm.tiempo">
+                    <input type="text" placeholder="Descripcion corta" ng-model="paradaForm.descripcion">
+                    <button class="btn btn-verde" ng-click="guardarParada()">Guardar</button>
+                    <button class="btn btn-gris" ng-click="cancelarParada()">X</button>
+                </div>
+
+                <!-- Tabla de paradas (ordenadas por orden, segun la API) -->
+                <table class="tabla">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Orden</th>
+                            <th>Parada</th>
+                            <th>Coordenadas (Lat, Long)</th>
+                            <th>Tiempo</th>
+                            <th>Descripcion</th>
+                            <th class="col-acciones">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr ng-repeat="parada in paradas">
+                            <td>{{ parada.id }}</td>
+                            <td>{{ parada.orden }}</td>
+                            <td><strong>{{ parada.nombre }}</strong></td>
+                            <td>({{ parada.latitud }}, {{ parada.longitud }})</td>
+                            <td>{{ parada.tiempo }} min</td>
+                            <td class="col-descripcion">{{ parada.descripcion }}</td>
+                            <td class="col-acciones">
+                                <button class="btn btn-amarillo" ng-click="editarParada(parada)">Editar</button>
+                                <button class="btn btn-rojo" ng-click="eliminarParada(parada)">Eliminar</button>
+                            </td>
+                        </tr>
+                        <tr ng-if="paradas.length === 0">
+                            <td colspan="7" class="vacio">Esta ruta aun no tiene paradas. Agrega una.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <!-- ----------------- MAPA ----------------- -->
+            <section class="tarjeta" ng-if="rutaSeleccionada">
+                <div class="tarjeta-cabecera oscuro">
+                    <span>Mapa de la Ruta: {{ rutaSeleccionada.nombre }}</span>
+                </div>
+                <!-- Contenedor donde Leaflet dibuja el mapa -->
+                <div id="mapa"></div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Scripts de la aplicacion (orden importante: primero app, luego service y controller) -->
+    <script src="js/app.js"></script>
+    <script src="js/services/apiService.js"></script>
+    <script src="js/controllers/mainController.js"></script>
+</body>
+</html>
